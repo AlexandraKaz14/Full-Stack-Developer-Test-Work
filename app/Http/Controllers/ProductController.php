@@ -3,17 +3,34 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\CreateProductRequest;
+use App\Http\Requests\IndexProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
+use Illuminate\Routing\Controller;
 
 class ProductController extends Controller
 {
+
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum')->except(['index', 'show']);
+    }
+
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(IndexProductRequest $request)
     {
-        return Product::query()->paginate(15);
+        $query = Product::query();
+
+        if ($request->filled('search')) {
+            $query->search($request->input('search'));
+        }
+
+        if ($request->filled('category_id')) {
+            $query->byCategory($request->input('category_id'));
+        }
+        return $query->paginate(15);
     }
 
     /**
