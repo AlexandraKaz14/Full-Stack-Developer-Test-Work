@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "/usr/local/Cellar/php/8.4.7/bin/php",
+            "args": [
+                "/Users/oleg/Desktop/test_task/Junior-Full-Stack-Developer/artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}
