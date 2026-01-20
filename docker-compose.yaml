@@ -1,0 +1,117 @@
+services:
+  # PHP + Laravel application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/conf.d/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+    networks:
+      - laravel-network
+    depends_on:
+      - postgresql
+      - redis
+    environment:
+      - DB_HOST=postgresql
+      - DB_PORT=5432
+      - DB_DATABASE=laravel_db
+      - DB_USERNAME=laravel_user
+      - DB_PASSWORD=secret123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  # Nginx web server
+  webserver:
+    image: nginx:alpine
+    container_name: laravel_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - laravel-network
+    depends_on:
+      - app
+
+  # PostgreSQL database
+  postgresql:
+    image: postgres:16-alpine
+    container_name: laravel_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=laravel_db
+      - POSTGRES_USER=laravel_user
+      - POSTGRES_PASSWORD=secret123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - laravel-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U laravel_user -d laravel_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: laravel_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - laravel-network
+    command: redis-server --appendonly yes
+
+  # Node.js for frontend (Vite/NPM)
+  node:
+    image: node:20-alpine
+    container_name: laravel_node
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - node_modules:/var/www/html/node_modules
+    networks:
+      - laravel-network
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - app
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog
+    container_name: laravel_mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - laravel-network
+
+networks:
+  laravel-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+    name: junior_full_stack_postgres_data
+  redis_data:
+    driver: local
+    name: junior_full_stack_redis_data
+  node_modules:
+    driver: local
+    name: junior_full_stack_node_modules
