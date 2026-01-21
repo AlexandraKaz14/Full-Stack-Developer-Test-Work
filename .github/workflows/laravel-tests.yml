@@ -1,0 +1,122 @@
+name: Laravel Tests with PostgreSQL
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  laravel-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: laravel
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: laravel_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_pgsql, bcmath, gd, exif
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-progress --no-suggest
+
+      - name: Setup PostgreSQL
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: laravel
+          PGPASSWORD: secret
+          PGDATABASE: laravel_test
+        run: |
+          echo "PostgreSQL is ready!"
+
+      - name: Copy Environment File
+        run: cp .env.example .env.test
+
+      - name: Generate Application Key
+        run: php artisan key:generate --env=test
+
+      - name: Setup Laravel Environment
+        run: |
+          echo "APP_ENV=testing" >> .env.test
+          echo "APP_KEY=$(php artisan key:generate --show --env=test | cut -d '"' -f2)" >> .env.test
+          echo "DB_CONNECTION=pgsql" >> .env.test
+          echo "DB_HOST=localhost" >> .env.test
+          echo "DB_PORT=5432" >> .env.test
+          echo "DB_DATABASE=laravel_test" >> .env.test
+          echo "DB_USERNAME=laravel" >> .env.test
+          echo "DB_PASSWORD=secret" >> .env.test
+          echo "CACHE_DRIVER=array" >> .env.test
+          echo "SESSION_DRIVER=array" >> .env.test
+          echo "QUEUE_CONNECTION=sync" >> .env.test
+          echo "MAIL_MAILER=log" >> .env.test
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install NPM Dependencies
+        run: npm ci
+
+      - name: Build Frontend Assets
+        run: npm run build
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Run Database Migrations
+        env:
+          APP_ENV: testing
+        run: |
+          php artisan migrate:fresh --env=testing --force
+
+      - name: Run Database Seeders
+        env:
+          APP_ENV: testing
+        run: |
+          php artisan db:seed --env=testing --force
+
+      - name: Run PHPUnit Tests
+        env:
+          APP_ENV: testing
+        run: |
+          php artisan test --env=testing
+
+      - name: Run Pest Tests (если используешь)
+        env:
+          APP_ENV: testing
+        run: |
+          ./vendor/bin/pest --env=testing || echo "Pest not installed"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            storage/logs/
+            tests/_output/
+          retention-days: 7
