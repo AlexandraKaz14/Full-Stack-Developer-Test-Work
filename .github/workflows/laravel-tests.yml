@@ -32,7 +32,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_pgsql, bcmath, gd, exif
           coverage: none
 
@@ -76,7 +76,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '23'
           cache: 'npm'
 
       - name: Install NPM Dependencies
